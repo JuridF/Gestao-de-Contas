@@ -27,9 +27,13 @@ let categorias = [
 
 // Global variables
 let currentEditingExpense = null;
+let monthlyBudget = 0;
 let categoryChart = null;
 let monthChart = null;
 let statusChart = null;
+let sortState = { column: 'dataVencimento', direction: 'asc' };
+let currentPage = 1;
+const rowsPerPage = 10;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
@@ -41,17 +45,20 @@ document.addEventListener('DOMContentLoaded', function() {
     renderExpenseTable();
     updateFileCounter();
     populateSelectors();
+    updateSortIcons();
 });
 
 // Data Management
 function saveDataToStorage() {
     localStorage.setItem('gastosData', JSON.stringify(gastosData));
     localStorage.setItem('categorias', JSON.stringify(categorias));
+    localStorage.setItem('monthlyBudget', monthlyBudget);
 }
 
 function loadDataFromStorage() {
     const savedGastos = localStorage.getItem('gastosData');
     const savedCategorias = localStorage.getItem('categorias');
+    const savedBudget = localStorage.getItem('monthlyBudget');
     
     if (savedGastos) {
         gastosData = JSON.parse(savedGastos);
@@ -59,6 +66,10 @@ function loadDataFromStorage() {
     
     if (savedCategorias) {
         categorias = JSON.parse(savedCategorias);
+    }
+
+    if (savedBudget) {
+        monthlyBudget = parseFloat(savedBudget);
     }
 }
 
@@ -111,6 +122,8 @@ function initializeEventListeners() {
     document.getElementById('categoryFilter').addEventListener('change', applyFilters);
     document.getElementById('statusFilter').addEventListener('change', applyFilters);
     document.getElementById('searchInput').addEventListener('input', applyFilters);
+    document.getElementById('startDateFilter').addEventListener('change', applyFilters);
+    document.getElementById('endDateFilter').addEventListener('change', applyFilters);
     
     // Upload
     document.getElementById('uploadZone').addEventListener('click', () => {
@@ -128,6 +141,52 @@ function initializeEventListeners() {
     const uploadZone = document.getElementById('uploadZone');
     uploadZone.addEventListener('dragover', handleDragOver);
     uploadZone.addEventListener('drop', handleDrop);
+
+    // Budget
+    document.getElementById('budgetInput').addEventListener('blur', function(e) {
+        const newBudget = parseFloat(e.target.value);
+        if (!isNaN(newBudget) && newBudget >= 0) {
+            monthlyBudget = newBudget;
+            saveDataToStorage();
+            updateBudget();
+            showToast('Orçamento atualizado com sucesso!', 'success');
+        } else if (e.target.value === '') {
+            monthlyBudget = 0;
+            saveDataToStorage();
+            updateBudget();
+        }
+    });
+
+    // Table Sorting
+    document.querySelector('#expenseTable thead').addEventListener('click', function(e) {
+        const header = e.target.closest('th');
+        if (header && header.classList.contains('sortable')) {
+            const column = header.dataset.sort;
+            if (sortState.column === column) {
+                sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortState.column = column;
+                sortState.direction = 'asc';
+            }
+            currentPage = 1;
+            renderExpenseTable();
+        }
+    });
+
+    // Pagination
+    document.getElementById('prevPageBtn').addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            renderExpenseTable();
+        }
+    });
+    document.getElementById('nextPageBtn').addEventListener('click', () => {
+        const totalRows = getFilteredExpenses().length;
+        if (currentPage * rowsPerPage < totalRows) {
+            currentPage++;
+            renderExpenseTable();
+        }
+    });
 }
 
 function toggleTheme() {
@@ -193,7 +252,46 @@ function showSection(sectionName) {
 // Dashboard Functions
 function updateDashboard() {
     updateMetrics();
+    updateBudget();
     updateCharts();
+}
+
+function updateBudget() {
+    const budgetInput = document.getElementById('budgetInput');
+    const budgetProgress = document.getElementById('budgetProgress');
+    const budgetSummary = document.getElementById('budgetSummary');
+
+    budgetInput.value = monthlyBudget > 0 ? monthlyBudget : '';
+
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+
+    const monthlyExpenses = gastosData.reduce((total, gasto) => {
+        const gastoDate = new Date(gasto.dataVencimento);
+        if (gastoDate.getMonth() === currentMonth && gastoDate.getFullYear() === currentYear) {
+            return total + gasto.valor;
+        }
+        return total;
+    }, 0);
+
+    let progressPercentage = 0;
+    if (monthlyBudget > 0) {
+        progressPercentage = Math.min((monthlyExpenses / monthlyBudget) * 100, 100);
+    }
+
+    budgetProgress.style.width = `${progressPercentage}%`;
+
+    // Change progress bar color if budget is exceeded
+    if (progressPercentage >= 100) {
+        budgetProgress.style.backgroundColor = 'var(--color-error)';
+    } else if (progressPercentage > 80) {
+        budgetProgress.style.backgroundColor = 'var(--color-warning)';
+    } else {
+        budgetProgress.style.backgroundColor = 'var(--color-success)';
+    }
+
+    budgetSummary.textContent = `${formatCurrency(monthlyExpenses)} / ${formatCurrency(monthlyBudget)}`;
 }
 
 function updateMetrics() {
@@ -364,12 +462,17 @@ function updateMonthChart() {
 
 // Table Functions
 function renderExpenseTable() {
+    updateSortIcons();
     const tableBody = document.getElementById('expenseTableBody');
-    const filteredData = getFilteredExpenses();
+    const allFilteredData = getFilteredExpenses();
     
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    const paginatedData = allFilteredData.slice(startIndex, endIndex);
+
     tableBody.innerHTML = '';
     
-    filteredData.forEach(gasto => {
+    paginatedData.forEach(gasto => {
         const row = document.createElement('tr');
         const categoria = categorias.find(cat => cat.id === gasto.categoria);
         
@@ -399,24 +502,93 @@ function renderExpenseTable() {
         
         tableBody.appendChild(row);
     });
+
+    updatePaginationControls(allFilteredData.length);
 }
 
 function getFilteredExpenses() {
     const categoryFilter = document.getElementById('categoryFilter').value;
     const statusFilter = document.getElementById('statusFilter').value;
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const startDate = document.getElementById('startDateFilter').value;
+    const endDate = document.getElementById('endDateFilter').value;
     
-    return gastosData.filter(gasto => {
+    let filteredData = gastosData.filter(gasto => {
+        const gastoDate = new Date(gasto.dataVencimento);
+
         const matchesCategory = !categoryFilter || gasto.categoria === categoryFilter;
         const matchesStatus = !statusFilter || gasto.status === statusFilter;
         const matchesSearch = !searchTerm || gasto.descricao.toLowerCase().includes(searchTerm);
         
-        return matchesCategory && matchesStatus && matchesSearch;
+        const matchesStartDate = !startDate || gastoDate >= new Date(startDate);
+        const matchesEndDate = !endDate || gastoDate <= new Date(endDate);
+
+        return matchesCategory && matchesStatus && matchesSearch && matchesStartDate && matchesEndDate;
     });
+
+    // Sorting logic
+    filteredData.sort((a, b) => {
+        const valA = a[sortState.column];
+        const valB = b[sortState.column];
+
+        let comparison = 0;
+        if (valA > valB) {
+            comparison = 1;
+        } else if (valA < valB) {
+            comparison = -1;
+        }
+
+        return sortState.direction === 'desc' ? comparison * -1 : comparison;
+    });
+
+    return filteredData;
 }
 
 function applyFilters() {
+    currentPage = 1;
     renderExpenseTable();
+}
+
+function updatePaginationControls(totalRows) {
+    const pageInfo = document.getElementById('paginationInfo');
+    const prevBtn = document.getElementById('prevPageBtn');
+    const nextBtn = document.getElementById('nextPageBtn');
+
+    const totalPages = Math.ceil(totalRows / rowsPerPage);
+
+    if (totalRows === 0) {
+        pageInfo.textContent = 'Nenhum gasto encontrado';
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+        return;
+    }
+
+    const startRow = (currentPage - 1) * rowsPerPage + 1;
+    const endRow = Math.min(currentPage * rowsPerPage, totalRows);
+
+    pageInfo.textContent = `Mostrando ${startRow}-${endRow} de ${totalRows}`;
+
+    prevBtn.disabled = currentPage === 1;
+    nextBtn.disabled = currentPage === totalPages;
+}
+
+function updateSortIcons() {
+    document.querySelectorAll('#expenseTable th.sortable').forEach(th => {
+        const icon = th.querySelector('i');
+        const column = th.dataset.sort;
+
+        th.classList.remove('active');
+        icon.className = 'fas fa-sort';
+
+        if (column === sortState.column) {
+            th.classList.add('active');
+            if (sortState.direction === 'asc') {
+                icon.className = 'fas fa-sort-up';
+            } else {
+                icon.className = 'fas fa-sort-down';
+            }
+        }
+    });
 }
 
 // Modal Functions
@@ -511,33 +683,118 @@ function processFiles(files) {
     files.forEach(file => {
         const item = document.createElement('div');
         item.className = 'card';
+        // Simplified initial UI for processing
         item.innerHTML = `
             <div class="card__body">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span>${file.name}</span>
-                    <span class="status-badge status-badge--pendente">Processando...</span>
-                </div>
-                <div style="margin-top: 8px; background: var(--color-bg-1); height: 4px; border-radius: 2px;">
-                    <div style="height: 100%; background: var(--color-primary); width: 0%; border-radius: 2px; transition: width 2s;"></div>
+                    <span class="status-badge status-badge--pendente" id="status-${file.name}">Processando...</span>
                 </div>
             </div>
         `;
-        
         queue.appendChild(item);
-        
-        // Simulate upload progress
-        const progressBar = item.querySelector('div[style*="width: 0%"]');
-        const statusBadge = item.querySelector('.status-badge');
-        
-        setTimeout(() => {
-            progressBar.style.width = '100%';
-            setTimeout(() => {
-                statusBadge.textContent = 'Concluído';
-                statusBadge.className = 'status-badge status-badge--pago';
-                showToast(`Arquivo ${file.name} processado com sucesso!`, 'success');
-            }, 2000);
-        }, 500);
+
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            try {
+                const content = e.target.result;
+                let newExpenses = 0;
+                if (file.name.endsWith('.csv')) {
+                    newExpenses = parseCSV(content);
+                } else {
+                    // Placeholder for Excel files
+                    throw new Error('Tipo de arquivo não suportado ainda.');
+                }
+
+                if (newExpenses > 0) {
+                    saveDataToStorage();
+                    updateDashboard();
+                    renderExpenseTable();
+                    updateFileCounter();
+                    populateSelectors();
+                    showToast(`${newExpenses} gastos importados de ${file.name}!`, 'success');
+                    document.getElementById(`status-${file.name}`).textContent = 'Concluído';
+                    document.getElementById(`status-${file.name}`).className = 'status-badge status-badge--pago';
+                } else {
+                    throw new Error('Nenhum gasto válido encontrado no arquivo.');
+                }
+
+            } catch (error) {
+                showToast(`Erro ao processar ${file.name}: ${error.message}`, 'error');
+                document.getElementById(`status-${file.name}`).textContent = 'Erro';
+                document.getElementById(`status-${file.name}`).className = 'status-badge status-badge--atrasado';
+            }
+        };
+
+        reader.onerror = function() {
+            showToast(`Erro ao ler o arquivo ${file.name}.`, 'error');
+            document.getElementById(`status-${file.name}`).textContent = 'Erro';
+            document.getElementById(`status-${file.name}`).className = 'status-badge status-badge--atrasado';
+        };
+
+        if (file.name.endsWith('.csv')) {
+            reader.readAsText(file);
+        } else {
+            // For excel, would be reader.readAsArrayBuffer(file);
+            showToast(`O tipo de arquivo de ${file.name} ainda não é suportado.`, 'warning');
+            document.getElementById(`status-${file.name}`).textContent = 'Não suportado';
+            document.getElementById(`status-${file.name}`).className = 'status-badge status-badge--pendente';
+        }
     });
+}
+
+function parseCSV(content) {
+    const lines = content.split('\\n').filter(line => line.trim() !== '');
+    if (lines.length <= 1) return 0; // No data rows
+
+    const headers = lines[0].split(',').map(h => h.trim());
+    const requiredHeaders = ['descricao', 'valor', 'dataVencimento', 'categoria'];
+
+    // Check for required headers
+    const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+    if (missingHeaders.length > 0) {
+        throw new Error(`Cabeçalhos ausentes no CSV: ${missingHeaders.join(', ')}`);
+    }
+
+    const newExpenses = [];
+    const existingIds = new Set(gastosData.map(g => g.id));
+    let nextId = Math.max(...gastosData.map(g => g.id), 0) + 1;
+
+    for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',');
+        const expenseData = {};
+        
+        headers.forEach((header, index) => {
+            expenseData[header] = values[index] ? values[index].trim() : '';
+        });
+
+        // Basic validation
+        if (!expenseData.descricao || !expenseData.valor || !expenseData.dataVencimento) {
+            console.warn(`Linha ${i+1} ignorada por falta de dados essenciais.`);
+            continue;
+        }
+        
+        // Find or create category
+        let categoryId = categorias.find(c => c.nome.toLowerCase() === expenseData.categoria.toLowerCase())?.id;
+        if (!categoryId) {
+            categoryId = 'outros'; // Default to 'outros'
+        }
+
+        const newExpense = {
+            id: nextId++,
+            descricao: expenseData.descricao,
+            valor: parseFloat(expenseData.valor),
+            dataVencimento: expenseData.dataVencimento, // Assuming YYYY-MM-DD format
+            categoria: categoryId,
+            status: expenseData.status || 'pendente'
+        };
+
+        newExpenses.push(newExpense);
+    }
+
+    gastosData.push(...newExpenses);
+    return newExpenses.length;
 }
 
 // Reports Functions

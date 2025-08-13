@@ -78,6 +78,21 @@
 
             <!-- Metrics Cards -->
             <div class="metrics">
+                <div class="card metrics__card budget-card">
+                    <div class="metrics__icon metrics__icon--success">
+                        <i class="fas fa-bullseye"></i>
+                    </div>
+                    <div class="metrics__content">
+                        <div class="budget-card__header">
+                            <p class="metrics__label">Orçamento Mensal</p>
+                            <input type="number" id="budgetInput" class="form-control form-control--sm" placeholder="Definir meta...">
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-bar__inner" id="budgetProgress"></div>
+                        </div>
+                        <p class="budget-card__summary" id="budgetSummary">R$ 0,00 / R$ 0,00</p>
+                    </div>
+                </div>
                 <div class="card metrics__card">
                     <div class="metrics__icon metrics__icon--danger">
                         <i class="fas fa-exclamation-triangle"></i>
@@ -150,6 +165,11 @@
                             <option value="pago">Pago</option>
                             <option value="atrasado">Atrasado</option>
                         </select>
+                        <div class="date-filter">
+                            <input type="date" class="form-control" id="startDateFilter">
+                            <span>-</span>
+                            <input type="date" class="form-control" id="endDateFilter">
+                        </div>
                         <div class="search-box">
                             <i class="fas fa-search"></i>
                             <input type="text" class="form-control" id="searchInput" placeholder="Buscar gastos...">
@@ -160,9 +180,9 @@
                     <table class="table" id="expenseTable">
                         <thead>
                             <tr>
-                                <th>Descrição</th>
-                                <th>Valor</th>
-                                <th>Vencimento</th>
+                                <th class="sortable" data-sort="descricao">Descrição <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-sort="valor">Valor <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-sort="dataVencimento">Vencimento <i class="fas fa-sort"></i></th>
                                 <th>Categoria</th>
                                 <th>Status</th>
                                 <th>Ações</th>
@@ -171,6 +191,13 @@
                         <tbody id="expenseTableBody">
                         </tbody>
                     </table>
+                </div>
+                <div class="table-card__footer">
+                    <span id="paginationInfo"></span>
+                    <div class="pagination-controls">
+                        <button class="btn btn--secondary" id="prevPageBtn" disabled>&lt; Anterior</button>
+                        <button class="btn btn--secondary" id="nextPageBtn">Próxima &gt;</button>
+                    </div>
                 </div>
             </div>
         </section>
