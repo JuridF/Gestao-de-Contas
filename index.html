@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Financeiro</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header__left">
+            <button class="header__toggle" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="header__logo">
+                <i class="fas fa-chart-line"></i>
+                <span>Dashboard Financeiro</span>
+            </div>
+        </div>
+        
+        <div class="header__right">
+            <div class="header__file-counter">
+                <i class="fas fa-file"></i>
+                <span id="fileCounter">15</span> gastos
+            </div>
+            <button class="header__add-btn" id="addExpenseBtn">
+                <i class="fas fa-plus"></i>
+            </button>
+            <button class="header__theme-toggle" id="themeToggle">
+                <i class="fas fa-moon"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <nav class="sidebar__nav">
+            <ul class="sidebar__list">
+                <li class="sidebar__item">
+                    <button class="sidebar__link sidebar__link--active" data-section="dashboard">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </button>
+                </li>
+                <li class="sidebar__item">
+                    <button class="sidebar__link" data-section="upload">
+                        <i class="fas fa-upload"></i>
+                        <span>Upload</span>
+                    </button>
+                </li>
+                <li class="sidebar__item">
+                    <button class="sidebar__link" data-section="reports">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Relatórios</span>
+                    </button>
+                </li>
+                <li class="sidebar__item">
+                    <button class="sidebar__link" data-section="settings">
+                        <i class="fas fa-cog"></i>
+                        <span>Configurações</span>
+                    </button>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main" id="main">
+        <!-- Dashboard Section -->
+        <section class="section section--active" id="dashboard-section">
+            <div class="section__header">
+                <h1 class="section__title">Dashboard</h1>
+                <p class="section__subtitle">Visão geral dos seus gastos</p>
+            </div>
+
+            <!-- Metrics Cards -->
+            <div class="metrics">
+                <div class="card metrics__card">
+                    <div class="metrics__icon metrics__icon--danger">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="metrics__content">
+                        <h3 class="metrics__value" id="overdueAmount">R$ 0,00</h3>
+                        <p class="metrics__label">Gastos Atrasados</p>
+                    </div>
+                </div>
+                
+                <div class="card metrics__card">
+                    <div class="metrics__icon metrics__icon--warning">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="metrics__content">
+                        <h3 class="metrics__value" id="pendingAmount">R$ 0,00</h3>
+                        <p class="metrics__label">Gastos Pendentes</p>
+                    </div>
+                </div>
+                
+                <div class="card metrics__card">
+                    <div class="metrics__icon metrics__icon--primary">
+                        <i class="fas fa-calculator"></i>
+                    </div>
+                    <div class="metrics__content">
+                        <h3 class="metrics__value" id="totalAmount">R$ 0,00</h3>
+                        <p class="metrics__label">Total de Gastos</p>
+                    </div>
+                </div>
+                
+                <div class="card metrics__card">
+                    <div class="metrics__icon metrics__icon--info">
+                        <i class="fas fa-calendar-week"></i>
+                    </div>
+                    <div class="metrics__content">
+                        <h3 class="metrics__value" id="weekAmount">R$ 0,00</h3>
+                        <p class="metrics__label">Esta Semana</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="charts">
+                <div class="card chart-card">
+                    <h3 class="chart-card__title">Gastos por Categoria</h3>
+                    <div class="chart-container" style="position: relative; height: 300px;">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="card chart-card">
+                    <h3 class="chart-card__title">Gastos por Mês</h3>
+                    <div class="chart-container" style="position: relative; height: 300px;">
+                        <canvas id="monthChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Expense Table -->
+            <div class="card table-card">
+                <div class="table-card__header">
+                    <h3 class="table-card__title">Lista de Gastos</h3>
+                    <div class="table-card__filters">
+                        <select class="form-control" id="categoryFilter">
+                            <option value="">Todas as categorias</option>
+                        </select>
+                        <select class="form-control" id="statusFilter">
+                            <option value="">Todos os status</option>
+                            <option value="pendente">Pendente</option>
+                            <option value="pago">Pago</option>
+                            <option value="atrasado">Atrasado</option>
+                        </select>
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" class="form-control" id="searchInput" placeholder="Buscar gastos...">
+                        </div>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="table" id="expenseTable">
+                        <thead>
+                            <tr>
+                                <th>Descrição</th>
+                                <th>Valor</th>
+                                <th>Vencimento</th>
+                                <th>Categoria</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expenseTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Upload Section -->
+        <section class="section" id="upload-section">
+            <div class="section__header">
+                <h1 class="section__title">Upload de Arquivos</h1>
+                <p class="section__subtitle">Importe gastos de arquivos CSV ou Excel</p>
+            </div>
+
+            <div class="upload-area">
+                <div class="card upload-card" id="uploadZone">
+                    <div class="upload-card__icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <h3 class="upload-card__title">Arraste arquivos aqui</h3>
+                    <p class="upload-card__subtitle">ou clique para selecionar</p>
+                    <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" multiple hidden>
+                    <button class="btn btn--primary" onclick="document.getElementById('fileInput').click()">
+                        Selecionar Arquivos
+                    </button>
+                </div>
+
+                <div class="upload-queue" id="uploadQueue"></div>
+            </div>
+        </section>
+
+        <!-- Reports Section -->
+        <section class="section" id="reports-section">
+            <div class="section__header">
+                <h1 class="section__title">Relatórios</h1>
+                <p class="section__subtitle">Análise detalhada dos seus gastos</p>
+            </div>
+
+            <div class="reports-grid">
+                <div class="card report-card">
+                    <h3 class="report-card__title">Gastos por Status</h3>
+                    <div class="chart-container" style="position: relative; height: 300px;">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card report-card">
+                    <h3 class="report-card__title">Resumo Mensal</h3>
+                    <div class="summary-list" id="monthlySummary">
+                        <!-- Summary items will be generated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Settings Section -->
+        <section class="section" id="settings-section">
+            <div class="section__header">
+                <h1 class="section__title">Configurações</h1>
+                <p class="section__subtitle">Personalize sua experiência</p>
+            </div>
+
+            <div class="settings-grid">
+                <div class="card settings-card">
+                    <h3 class="settings-card__title">Aparência</h3>
+                    <div class="form-group">
+                        <label class="form-label">Tema</label>
+                        <select class="form-control" id="themeSelect">
+                            <option value="auto">Automático</option>
+                            <option value="light">Claro</option>
+                            <option value="dark">Escuro</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="card settings-card">
+                    <h3 class="settings-card__title">Categorias</h3>
+                    <div class="category-list" id="categoryList">
+                        <!-- Categories will be generated by JavaScript -->
+                    </div>
+                    <button class="btn btn--secondary btn--full-width" id="addCategoryBtn">
+                        <i class="fas fa-plus"></i> Adicionar Categoria
+                    </button>
+                </div>
+
+                <div class="card settings-card">
+                    <h3 class="settings-card__title">Dados</h3>
+                    <div class="settings-actions">
+                        <button class="btn btn--secondary" id="exportDataBtn">
+                            <i class="fas fa-download"></i> Exportar Dados
+                        </button>
+                        <button class="btn btn--secondary" id="importDataBtn">
+                            <i class="fas fa-upload"></i> Importar Dados
+                        </button>
+                        <button class="btn btn--outline" id="clearDataBtn">
+                            <i class="fas fa-trash"></i> Limpar Todos os Dados
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal for Adding/Editing Expenses -->
+    <div class="modal hidden" id="expenseModal">
+        <div class="modal__backdrop" id="modalBackdrop"></div>
+        <div class="modal__content">
+            <div class="modal__header">
+                <h3 class="modal__title" id="modalTitle">Adicionar Gasto</h3>
+                <button class="modal__close" id="modalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form class="modal__body" id="expenseForm">
+                <div class="form-group">
+                    <label class="form-label">Descrição</label>
+                    <input type="text" class="form-control" id="expenseDescription" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Valor</label>
+                    <input type="number" class="form-control" id="expenseValue" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data de Vencimento</label>
+                    <input type="date" class="form-control" id="expenseDueDate" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Categoria</label>
+                    <select class="form-control" id="expenseCategory" required>
+                        <!-- Options will be generated by JavaScript -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select class="form-control" id="expenseStatus" required>
+                        <option value="pendente">Pendente</option>
+                        <option value="pago">Pago</option>
+                        <option value="atrasado">Atrasado</option>
+                    </select>
+                </div>
+                <div class="modal__actions">
+                    <button type="button" class="btn btn--outline" id="cancelBtn">Cancelar</button>
+                    <button type="submit" class="btn btn--primary" id="saveBtn">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
